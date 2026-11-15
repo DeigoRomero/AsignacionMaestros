@@ -1,47 +1,180 @@
 /* =====================================================================
-   05_disponibilidad.sql
-   Disponibilidad (MaestroMateriaBloque) de los maestros de 04_datos_reales.sql.
+   05_horario_completo.sql
+   Horario de los 8 semestres (con sus materias reales) y disponibilidad de los 85 maestros.
+   REEMPLAZA a 05_disponibilidad.sql (no hace falta correr el 05 si corres este).
 
-   - Materias de cada maestro: encabezados de seccion + comentarios "+ ..." del script de Angie.
-   - Horas: ALEATORIAS pero repetibles (semilla 2026). Cada maestro tiene una ventana
-     de horas deseada (ej. 08-10, 10-12 o todo el dia) y es la misma para todas sus materias.
-   - Cambiar la semilla en el generador da otra distribucion; el algoritmo funciona con cualquiera.
+   Que hace:
+   - Dia de 6 horas (08-14): cada semestre tiene 6 materias, una por hora (el 8o tiene 4).
+   - 19 paquetes (grupos): sem1 x4, sem2 x3, sem3 x3, sem4 x2, sem5 x3, sem6 x2, sem7 x1, sem8 x1.
+   - Cada grupo rota el orden de las materias (el grupo B empieza una materia despues que el A, etc.)
+     para que un mismo maestro pueda atender a varios grupos a horas distintas.
+   - Disponibilidad: materias de tus comentarios; horas ALEATORIAS repetibles (semilla 2026),
+     una ventana de horas por maestro, igual para todas sus materias.
+   - Unifica las personas con dos claves (DOC030 -> DOC002, DOC085 -> DOC068) y recorta espacios.
 
-   EJECUTAR DESPUES de 04_datos_reales.sql. Es seguro repetirlo: limpia y vuelve a cargar.
+   EJECUTAR DESPUES de 04_datos_reales.sql. Es seguro repetirlo.
+   ATENCION: borra los slots, la disponibilidad y las asignaciones actuales.
    ===================================================================== */
 USE AsignacionMaestros;
 GO
 SET XACT_ABORT ON;
 BEGIN TRANSACTION;
 
-EXEC sp_set_session_context @key = N'Origen', @value = N'Limpieza';
-
-/* 1) Quitar asignaciones previas (la llave foranea no deja borrar disponibilidad en uso) */
-UPDATE PaqueteMateria
-SET    IdMaestro = NULL, Estado = 'Pendiente', MotivoPendiente = NULL
-WHERE  IdMaestro IS NOT NULL OR MotivoPendiente IS NOT NULL;
-
-/* 2) Quitar la disponibilidad de ejemplo anterior (era de los 10 maestros ficticios) */
+/* ---------- LIMPIEZA (en orden por las llaves foraneas) ---------- */
+DELETE FROM PaqueteMateria;          -- tambien borra su bitacora (ON DELETE CASCADE)
 DELETE FROM MaestroMateriaBloque;
+DELETE FROM Paquete;
+DELETE FROM Bloque;
 
-/* 3) Unificar personas repetidas: la misma persona tenia dos claves.
-      DOC030 (Zenaido Antonio Aguilar) -> sus materias quedan en DOC002
-      DOC085 (Sergio Contreras Hernandez) -> sus materias quedan en DOC068
-   Con dos claves, el sistema podria ponerla en dos grupos a la misma hora. */
+/* ---------- BLOQUES: 6 horas por dia ---------- */
+INSERT INTO Bloque (IdBloque, HoraInicio, HoraFin) VALUES
+ (1,'08:00','09:00'),(2,'09:00','10:00'),(3,'10:00','11:00'),
+ (4,'11:00','12:00'),(5,'12:00','13:00'),(6,'13:00','14:00');
+
+/* ---------- MAESTROS: unificar duplicados y limpiar espacios ---------- */
 DELETE FROM Maestro WHERE Clave IN ('DOC030', 'DOC085');
-
-/* 4) Quitar espacios sobrantes en los nombres (ej. 'Campis ') */
 UPDATE Maestro SET Nombre = LTRIM(RTRIM(Nombre));
 
-/* 5) Disponibilidad: (85 maestros, 151 pares maestro-materia, 450 filas) */
+/* ---------- PAQUETES (grado = semestre) ---------- */
+INSERT INTO Paquete (IdPeriodo, Grado, Grupo)
+SELECT p.IdPeriodo, v.Grado, v.Grupo
+FROM Periodo p CROSS JOIN (VALUES (1,'A'),(1,'B'),(1,'C'),(1,'D'),(2,'A'),(2,'B'),(2,'C'),(3,'A'),(3,'B'),(3,'C'),(4,'A'),(4,'B'),(5,'A'),(5,'B'),(5,'C'),(6,'A'),(6,'B'),(7,'A'),(8,'A')) v(Grado, Grupo)
+WHERE p.Clave = N'AGO-DIC 2026';
+
+/* ---------- HORARIO DE GRUPOS: 112 slots ---------- */
+-- ORDER BY v.n asegura que los Id se asignen en este orden (resultado repetible).
+INSERT INTO PaqueteMateria (IdPaquete, IdPeriodo, IdMateria, IdBloque)
+SELECT pa.IdPaquete, pa.IdPeriodo, ma.IdMateria, v.Bloque
+FROM (VALUES
+ (1,'1A','ACF-0901',1),
+ (2,'1A','AED-1285',2),
+ (3,'1A','ACC-0906',3),
+ (4,'1A','SCH-1024',4),
+ (5,'1A','ACA-0907',5),
+ (6,'1A','AEF-1041',6),
+ (7,'1B','AED-1285',1),
+ (8,'1B','ACC-0906',2),
+ (9,'1B','SCH-1024',3),
+ (10,'1B','ACA-0907',4),
+ (11,'1B','AEF-1041',5),
+ (12,'1B','ACF-0901',6),
+ (13,'1C','ACC-0906',1),
+ (14,'1C','SCH-1024',2),
+ (15,'1C','ACA-0907',3),
+ (16,'1C','AEF-1041',4),
+ (17,'1C','ACF-0901',5),
+ (18,'1C','AED-1285',6),
+ (19,'1D','SCH-1024',1),
+ (20,'1D','ACA-0907',2),
+ (21,'1D','AEF-1041',3),
+ (22,'1D','ACF-0901',4),
+ (23,'1D','AED-1285',5),
+ (24,'1D','ACC-0906',6),
+ (25,'2A','ACF-0902',1),
+ (26,'2A','AED-1286',2),
+ (27,'2A','ACF-0903',3),
+ (28,'2A','SCC-1005',4),
+ (29,'2A','AEF-1052',5),
+ (30,'2A','SCF-1006',6),
+ (31,'2B','AED-1286',1),
+ (32,'2B','ACF-0903',2),
+ (33,'2B','SCC-1005',3),
+ (34,'2B','AEF-1052',4),
+ (35,'2B','SCF-1006',5),
+ (36,'2B','ACF-0902',6),
+ (37,'2C','ACF-0903',1),
+ (38,'2C','SCC-1005',2),
+ (39,'2C','AEF-1052',3),
+ (40,'2C','SCF-1006',4),
+ (41,'2C','ACF-0902',5),
+ (42,'2C','AED-1286',6),
+ (43,'3A','ACF-0904',1),
+ (44,'3A','AED-1026',2),
+ (45,'3A','AEC-1058',3),
+ (46,'3A','AEC-1008',4),
+ (47,'3A','SCC-1013',5),
+ (48,'3A','SCD-1018',6),
+ (49,'3B','AED-1026',1),
+ (50,'3B','AEC-1058',2),
+ (51,'3B','AEC-1008',3),
+ (52,'3B','SCC-1013',4),
+ (53,'3B','SCD-1018',5),
+ (54,'3B','ACF-0904',6),
+ (55,'3C','AEC-1058',1),
+ (56,'3C','AEC-1008',2),
+ (57,'3C','SCC-1013',3),
+ (58,'3C','SCD-1018',4),
+ (59,'3C','ACF-0904',5),
+ (60,'3C','AED-1026',6),
+ (61,'4A','ACF-0905',1),
+ (62,'4A','SCD-1027',2),
+ (63,'4A','SCC-1017',3),
+ (64,'4A','AEF-1031',4),
+ (65,'4A','SCD-1022',5),
+ (66,'4A','SCD-1003',6),
+ (67,'4B','SCD-1027',1),
+ (68,'4B','SCC-1017',2),
+ (69,'4B','AEF-1031',3),
+ (70,'4B','SCD-1022',4),
+ (71,'4B','SCD-1003',5),
+ (72,'4B','ACF-0905',6),
+ (73,'5A','SCC-1010',1),
+ (74,'5A','AEC-1034',2),
+ (75,'5A','AEC-1061',3),
+ (76,'5A','SCA-1025',4),
+ (77,'5A','SCC-1007',5),
+ (78,'5A','ACD-0908',6),
+ (79,'5B','AEC-1034',1),
+ (80,'5B','AEC-1061',2),
+ (81,'5B','SCA-1025',3),
+ (82,'5B','SCC-1007',4),
+ (83,'5B','ACD-0908',5),
+ (84,'5B','SCC-1010',6),
+ (85,'5C','AEC-1061',1),
+ (86,'5C','SCA-1025',2),
+ (87,'5C','SCC-1007',3),
+ (88,'5C','ACD-0908',4),
+ (89,'5C','SCC-1010',5),
+ (90,'5C','AEC-1034',6),
+ (91,'6A','SCD-1015',1),
+ (92,'6A','SCD-1021',2),
+ (93,'6A','SCA-1026',3),
+ (94,'6A','SCB-1001',4),
+ (95,'6A','SCD-1011',5),
+ (96,'6A','SCC-1014',6),
+ (97,'6B','SCD-1021',1),
+ (98,'6B','SCA-1026',2),
+ (99,'6B','SCB-1001',3),
+ (100,'6B','SCD-1011',4),
+ (101,'6B','SCC-1014',5),
+ (102,'6B','SCD-1015',6),
+ (103,'7A','SCD-1016',1),
+ (104,'7A','SCD-1004',2),
+ (105,'7A','ACA-0909',3),
+ (106,'7A','SCC-1019',4),
+ (107,'7A','SCG-1009',5),
+ (108,'7A','SCC-1023',6),
+ (109,'8A','AEB-1055',1),
+ (110,'8A','SCA-1002',2),
+ (111,'8A','ACA-0910',3),
+ (112,'8A','SCC-1002',4)
+) v(n, Paquete, Materia, Bloque)
+JOIN Periodo p  ON p.Clave = N'AGO-DIC 2026'
+JOIN Paquete pa ON pa.IdPeriodo = p.IdPeriodo AND pa.Clave = v.Paquete
+JOIN Materia ma ON ma.Clave = v.Materia
+ORDER BY v.n;
+
+/* ---------- DISPONIBILIDAD: 85 maestros, 151 pares maestro-materia, 614 filas ---------- */
 INSERT INTO MaestroMateriaBloque (IdPeriodo, IdMaestro, IdMateria, IdBloque)
 SELECT p.IdPeriodo, mt.IdMaestro, ma.IdMateria, v.Bloque
 FROM (VALUES
- -- DOC001 Julio Campos Morales · horario 08-12 · 1 materia(s)
+ -- DOC001 Julio Campos Morales · horario 08-14 · 1 materia(s)
  ('DOC001','ACF-0901',1),
  ('DOC001','ACF-0901',2),
  ('DOC001','ACF-0901',3),
  ('DOC001','ACF-0901',4),
+ ('DOC001','ACF-0901',5),
+ ('DOC001','ACF-0901',6),
  -- DOC002 Zenaido Antonio Aguilar De Leon · horario 08-11 · 2 materia(s)
  ('DOC002','ACF-0901',1),
  ('DOC002','ACF-0901',2),
@@ -62,157 +195,233 @@ FROM (VALUES
  ('DOC003','ACF-0905',1),
  ('DOC003','ACF-0905',2),
  ('DOC003','ACF-0905',3),
- -- DOC004 Jose Gerardo Benjamín Mancilla Silva · horario 09-11 · 2 materia(s)
+ -- DOC004 Jose Gerardo Benjamín Mancilla Silva · horario 09-14 · 2 materia(s)
  ('DOC004','ACF-0901',2),
  ('DOC004','ACF-0901',3),
+ ('DOC004','ACF-0901',4),
+ ('DOC004','ACF-0901',5),
+ ('DOC004','ACF-0901',6),
  ('DOC004','ACF-0903',2),
  ('DOC004','ACF-0903',3),
- -- DOC005 Selene Laces Valdiviezo · horario 08-12 · 2 materia(s)
+ ('DOC004','ACF-0903',4),
+ ('DOC004','ACF-0903',5),
+ ('DOC004','ACF-0903',6),
+ -- DOC005 Selene Laces Valdiviezo · horario 08-14 · 2 materia(s)
  ('DOC005','ACF-0901',1),
  ('DOC005','ACF-0901',2),
  ('DOC005','ACF-0901',3),
  ('DOC005','ACF-0901',4),
+ ('DOC005','ACF-0901',5),
+ ('DOC005','ACF-0901',6),
  ('DOC005','ACF-0902',1),
  ('DOC005','ACF-0902',2),
  ('DOC005','ACF-0902',3),
  ('DOC005','ACF-0902',4),
- -- DOC006 Rogelio Escobedo Mitre · horario 08-12 · 3 materia(s)
+ ('DOC005','ACF-0902',5),
+ ('DOC005','ACF-0902',6),
+ -- DOC006 Rogelio Escobedo Mitre · horario 08-14 · 3 materia(s)
  ('DOC006','ACF-0901',1),
  ('DOC006','ACF-0901',2),
  ('DOC006','ACF-0901',3),
  ('DOC006','ACF-0901',4),
+ ('DOC006','ACF-0901',5),
+ ('DOC006','ACF-0901',6),
  ('DOC006','ACF-0903',1),
  ('DOC006','ACF-0903',2),
  ('DOC006','ACF-0903',3),
  ('DOC006','ACF-0903',4),
+ ('DOC006','ACF-0903',5),
+ ('DOC006','ACF-0903',6),
  ('DOC006','SCA-1026',1),
  ('DOC006','SCA-1026',2),
  ('DOC006','SCA-1026',3),
  ('DOC006','SCA-1026',4),
- -- DOC007 María Leticia Lomeli Briones · horario 09-12 · 3 materia(s)
- ('DOC007','AED-1285',2),
- ('DOC007','AED-1285',3),
+ ('DOC006','SCA-1026',5),
+ ('DOC006','SCA-1026',6),
+ -- DOC007 María Leticia Lomeli Briones · horario 11-14 · 3 materia(s)
  ('DOC007','AED-1285',4),
- ('DOC007','ACA-0907',2),
- ('DOC007','ACA-0907',3),
+ ('DOC007','AED-1285',5),
+ ('DOC007','AED-1285',6),
  ('DOC007','ACA-0907',4),
- ('DOC007','SCC-1005',2),
- ('DOC007','SCC-1005',3),
+ ('DOC007','ACA-0907',5),
+ ('DOC007','ACA-0907',6),
  ('DOC007','SCC-1005',4),
- -- DOC008 Lizeth Chavira Macias · horario 09-12 · 4 materia(s)
+ ('DOC007','SCC-1005',5),
+ ('DOC007','SCC-1005',6),
+ -- DOC008 Lizeth Chavira Macias · horario 08-11 · 4 materia(s)
+ ('DOC008','AED-1285',1),
  ('DOC008','AED-1285',2),
  ('DOC008','AED-1285',3),
- ('DOC008','AED-1285',4),
+ ('DOC008','ACC-0906',1),
  ('DOC008','ACC-0906',2),
  ('DOC008','ACC-0906',3),
- ('DOC008','ACC-0906',4),
+ ('DOC008','AEF-1041',1),
  ('DOC008','AEF-1041',2),
  ('DOC008','AEF-1041',3),
- ('DOC008','AEF-1041',4),
+ ('DOC008','SCC-1005',1),
  ('DOC008','SCC-1005',2),
  ('DOC008','SCC-1005',3),
- ('DOC008','SCC-1005',4),
- -- DOC009 José Adolfo Medina Cervantes · horario 09-11 · 4 materia(s)
+ -- DOC009 José Adolfo Medina Cervantes · horario 08-13 · 4 materia(s)
+ ('DOC009','AED-1285',1),
  ('DOC009','AED-1285',2),
  ('DOC009','AED-1285',3),
+ ('DOC009','AED-1285',4),
+ ('DOC009','AED-1285',5),
+ ('DOC009','ACC-0906',1),
  ('DOC009','ACC-0906',2),
  ('DOC009','ACC-0906',3),
+ ('DOC009','ACC-0906',4),
+ ('DOC009','ACC-0906',5),
+ ('DOC009','AED-1286',1),
  ('DOC009','AED-1286',2),
  ('DOC009','AED-1286',3),
+ ('DOC009','AED-1286',4),
+ ('DOC009','AED-1286',5),
+ ('DOC009','ACD-0908',1),
  ('DOC009','ACD-0908',2),
  ('DOC009','ACD-0908',3),
- -- DOC010 Karina Aidee Romero Alvarado · horario 09-12 · 2 materia(s)
+ ('DOC009','ACD-0908',4),
+ ('DOC009','ACD-0908',5),
+ -- DOC010 Karina Aidee Romero Alvarado · horario 08-11 · 2 materia(s)
+ ('DOC010','AED-1285',1),
  ('DOC010','AED-1285',2),
  ('DOC010','AED-1285',3),
- ('DOC010','AED-1285',4),
+ ('DOC010','AEF-1041',1),
  ('DOC010','AEF-1041',2),
  ('DOC010','AEF-1041',3),
- ('DOC010','AEF-1041',4),
- -- DOC011 Luz Elena Cortés Galvan · horario 08-10 · 3 materia(s)
+ -- DOC011 Luz Elena Cortés Galvan · horario 08-13 · 3 materia(s)
  ('DOC011','AED-1285',1),
  ('DOC011','AED-1285',2),
+ ('DOC011','AED-1285',3),
+ ('DOC011','AED-1285',4),
+ ('DOC011','AED-1285',5),
  ('DOC011','AED-1286',1),
  ('DOC011','AED-1286',2),
+ ('DOC011','AED-1286',3),
+ ('DOC011','AED-1286',4),
+ ('DOC011','AED-1286',5),
  ('DOC011','AED-1026',1),
  ('DOC011','AED-1026',2),
- -- DOC012 José De Jesus Parra Galaviz · horario 08-10 · 1 materia(s)
+ ('DOC011','AED-1026',3),
+ ('DOC011','AED-1026',4),
+ ('DOC011','AED-1026',5),
+ -- DOC012 José De Jesus Parra Galaviz · horario 08-13 · 1 materia(s)
  ('DOC012','AED-1285',1),
  ('DOC012','AED-1285',2),
- -- DOC013 Marco Antonio Rodriguez Moreno · horario 08-10 · 1 materia(s)
+ ('DOC012','AED-1285',3),
+ ('DOC012','AED-1285',4),
+ ('DOC012','AED-1285',5),
+ -- DOC013 Marco Antonio Rodriguez Moreno · horario 08-13 · 1 materia(s)
  ('DOC013','AED-1285',1),
  ('DOC013','AED-1285',2),
- -- DOC014 Claudia Negrete Sanchez · horario 09-12 · 4 materia(s)
- ('DOC014','ACC-0906',2),
- ('DOC014','ACC-0906',3),
+ ('DOC013','AED-1285',3),
+ ('DOC013','AED-1285',4),
+ ('DOC013','AED-1285',5),
+ -- DOC014 Claudia Negrete Sanchez · horario 11-14 · 4 materia(s)
  ('DOC014','ACC-0906',4),
- ('DOC014','AEF-1041',2),
- ('DOC014','AEF-1041',3),
+ ('DOC014','ACC-0906',5),
+ ('DOC014','ACC-0906',6),
  ('DOC014','AEF-1041',4),
- ('DOC014','AED-1286',2),
- ('DOC014','AED-1286',3),
+ ('DOC014','AEF-1041',5),
+ ('DOC014','AEF-1041',6),
  ('DOC014','AED-1286',4),
- ('DOC014','AED-1026',2),
- ('DOC014','AED-1026',3),
+ ('DOC014','AED-1286',5),
+ ('DOC014','AED-1286',6),
  ('DOC014','AED-1026',4),
- -- DOC015 Gabriela Torres Beltrán · horario 08-12 · 2 materia(s)
+ ('DOC014','AED-1026',5),
+ ('DOC014','AED-1026',6),
+ -- DOC015 Gabriela Torres Beltrán · horario 08-14 · 2 materia(s)
  ('DOC015','ACC-0906',1),
  ('DOC015','ACC-0906',2),
  ('DOC015','ACC-0906',3),
  ('DOC015','ACC-0906',4),
+ ('DOC015','ACC-0906',5),
+ ('DOC015','ACC-0906',6),
  ('DOC015','AED-1286',1),
  ('DOC015','AED-1286',2),
  ('DOC015','AED-1286',3),
  ('DOC015','AED-1286',4),
- -- DOC016 Claudia Ibeth Gonzalez Berrelleza · horario 09-12 · 2 materia(s)
- ('DOC016','ACC-0906',2),
- ('DOC016','ACC-0906',3),
+ ('DOC015','AED-1286',5),
+ ('DOC015','AED-1286',6),
+ -- DOC016 Claudia Ibeth Gonzalez Berrelleza · horario 11-14 · 2 materia(s)
  ('DOC016','ACC-0906',4),
- ('DOC016','AEF-1031',2),
- ('DOC016','AEF-1031',3),
+ ('DOC016','ACC-0906',5),
+ ('DOC016','ACC-0906',6),
  ('DOC016','AEF-1031',4),
- -- DOC017 Jesus Jaime Gonzalez Gonzalez · horario 08-12 · 1 materia(s)
+ ('DOC016','AEF-1031',5),
+ ('DOC016','AEF-1031',6),
+ -- DOC017 Jesus Jaime Gonzalez Gonzalez · horario 08-14 · 1 materia(s)
  ('DOC017','ACC-0906',1),
  ('DOC017','ACC-0906',2),
  ('DOC017','ACC-0906',3),
  ('DOC017','ACC-0906',4),
- -- DOC018 Martha Elena Pulido · horario 09-11 · 3 materia(s)
+ ('DOC017','ACC-0906',5),
+ ('DOC017','ACC-0906',6),
+ -- DOC018 Martha Elena Pulido · horario 09-14 · 3 materia(s)
  ('DOC018','ACC-0906',2),
  ('DOC018','ACC-0906',3),
+ ('DOC018','ACC-0906',4),
+ ('DOC018','ACC-0906',5),
+ ('DOC018','ACC-0906',6),
  ('DOC018','SCC-1007',2),
  ('DOC018','SCC-1007',3),
+ ('DOC018','SCC-1007',4),
+ ('DOC018','SCC-1007',5),
+ ('DOC018','SCC-1007',6),
  ('DOC018','SCD-1011',2),
  ('DOC018','SCD-1011',3),
- -- DOC019 Consuelo Fabiola Fausto Trujillo · horario 08-11 · 1 materia(s)
- ('DOC019','SCH-1024',1),
- ('DOC019','SCH-1024',2),
+ ('DOC018','SCD-1011',4),
+ ('DOC018','SCD-1011',5),
+ ('DOC018','SCD-1011',6),
+ -- DOC019 Consuelo Fabiola Fausto Trujillo · horario 10-14 · 1 materia(s)
  ('DOC019','SCH-1024',3),
- -- DOC020 Alma Sofia Flores Rivera · horario 09-11 · 1 materia(s)
+ ('DOC019','SCH-1024',4),
+ ('DOC019','SCH-1024',5),
+ ('DOC019','SCH-1024',6),
+ -- DOC020 Alma Sofia Flores Rivera · horario 09-14 · 1 materia(s)
  ('DOC020','SCH-1024',2),
  ('DOC020','SCH-1024',3),
- -- DOC021 Marco Jorge Aquino · horario 08-10 · 2 materia(s)
- ('DOC021','SCH-1024',1),
+ ('DOC020','SCH-1024',4),
+ ('DOC020','SCH-1024',5),
+ ('DOC020','SCH-1024',6),
+ -- DOC021 Marco Jorge Aquino · horario 09-13 · 2 materia(s)
  ('DOC021','SCH-1024',2),
- ('DOC021','SCD-1003',1),
+ ('DOC021','SCH-1024',3),
+ ('DOC021','SCH-1024',4),
+ ('DOC021','SCH-1024',5),
  ('DOC021','SCD-1003',2),
- -- DOC022 Maria de los Angeles Quezada Cisnero · horario 08-10 · 2 materia(s)
- ('DOC022','SCH-1024',1),
+ ('DOC021','SCD-1003',3),
+ ('DOC021','SCD-1003',4),
+ ('DOC021','SCD-1003',5),
+ -- DOC022 Maria de los Angeles Quezada Cisnero · horario 09-13 · 2 materia(s)
  ('DOC022','SCH-1024',2),
- ('DOC022','SCD-1027',1),
+ ('DOC022','SCH-1024',3),
+ ('DOC022','SCH-1024',4),
+ ('DOC022','SCH-1024',5),
  ('DOC022','SCD-1027',2),
- -- DOC023 Maria Isabel Renteria Lomeli · horario 08-12 · 2 materia(s)
+ ('DOC022','SCD-1027',3),
+ ('DOC022','SCD-1027',4),
+ ('DOC022','SCD-1027',5),
+ -- DOC023 Maria Isabel Renteria Lomeli · horario 08-14 · 2 materia(s)
  ('DOC023','SCH-1024',1),
  ('DOC023','SCH-1024',2),
  ('DOC023','SCH-1024',3),
  ('DOC023','SCH-1024',4),
+ ('DOC023','SCH-1024',5),
+ ('DOC023','SCH-1024',6),
  ('DOC023','SCC-1005',1),
  ('DOC023','SCC-1005',2),
  ('DOC023','SCC-1005',3),
  ('DOC023','SCC-1005',4),
- -- DOC024 Luz Maria Lugo Mendez · horario 08-12 · 1 materia(s)
+ ('DOC023','SCC-1005',5),
+ ('DOC023','SCC-1005',6),
+ -- DOC024 Luz Maria Lugo Mendez · horario 08-14 · 1 materia(s)
  ('DOC024','SCH-1024',1),
  ('DOC024','SCH-1024',2),
  ('DOC024','SCH-1024',3),
  ('DOC024','SCH-1024',4),
+ ('DOC024','SCH-1024',5),
+ ('DOC024','SCH-1024',6),
  -- DOC025 Rosana Gutierrez Montoya · horario 10-12 · 4 materia(s)
  ('DOC025','SCH-1024',3),
  ('DOC025','SCH-1024',4),
@@ -222,12 +431,15 @@ FROM (VALUES
  ('DOC025','SCG-1009',4),
  ('DOC025','ACA-0910',3),
  ('DOC025','ACA-0910',4),
- -- DOC026 Celia Grisel Escobedo Aparicio · horario 10-12 · 1 materia(s)
- ('DOC026','ACA-0907',3),
- ('DOC026','ACA-0907',4),
- -- DOC027 Cristina Cervantes Vivaldo · horario 09-11 · 1 materia(s)
+ -- DOC026 Celia Grisel Escobedo Aparicio · horario 12-14 · 1 materia(s)
+ ('DOC026','ACA-0907',5),
+ ('DOC026','ACA-0907',6),
+ -- DOC027 Cristina Cervantes Vivaldo · horario 09-14 · 1 materia(s)
  ('DOC027','ACA-0907',2),
  ('DOC027','ACA-0907',3),
+ ('DOC027','ACA-0907',4),
+ ('DOC027','ACA-0907',5),
+ ('DOC027','ACA-0907',6),
  -- DOC028 Claudia Selene Loreto Medina · horario 10-12 · 1 materia(s)
  ('DOC028','ACA-0907',3),
  ('DOC028','ACA-0907',4),
@@ -241,11 +453,13 @@ FROM (VALUES
  ('DOC029','ACF-0905',1),
  ('DOC029','ACF-0905',2),
  ('DOC029','ACF-0905',3),
- -- DOC031 Cynthia Ivette Miramontes Ortega · horario 08-12 · 1 materia(s)
+ -- DOC031 Cynthia Ivette Miramontes Ortega · horario 08-14 · 1 materia(s)
  ('DOC031','ACF-0902',1),
  ('DOC031','ACF-0902',2),
  ('DOC031','ACF-0902',3),
  ('DOC031','ACF-0902',4),
+ ('DOC031','ACF-0902',5),
+ ('DOC031','ACF-0902',6),
  -- DOC032 José Armando Rocha Rocha · horario 08-12 · 3 materia(s)
  ('DOC032','ACF-0902',1),
  ('DOC032','ACF-0902',2),
@@ -259,55 +473,72 @@ FROM (VALUES
  ('DOC032','ACF-0905',2),
  ('DOC032','ACF-0905',3),
  ('DOC032','ACF-0905',4),
- -- DOC033 José Enrique Montoya Lopez · horario 09-12 · 1 materia(s)
+ -- DOC033 José Enrique Montoya Lopez · horario 08-11 · 1 materia(s)
+ ('DOC033','ACF-0902',1),
  ('DOC033','ACF-0902',2),
  ('DOC033','ACF-0902',3),
- ('DOC033','ACF-0902',4),
- -- DOC034 Alejandra Mancilla Soto · horario 08-12 · 1 materia(s)
+ -- DOC034 Alejandra Mancilla Soto · horario 08-14 · 1 materia(s)
  ('DOC034','AED-1286',1),
  ('DOC034','AED-1286',2),
  ('DOC034','AED-1286',3),
  ('DOC034','AED-1286',4),
- -- DOC035 Ramón Antonio Castro Garcia · horario 08-11 · 2 materia(s)
- ('DOC035','AED-1286',1),
- ('DOC035','AED-1286',2),
+ ('DOC034','AED-1286',5),
+ ('DOC034','AED-1286',6),
+ -- DOC035 Ramón Antonio Castro Garcia · horario 10-14 · 2 materia(s)
  ('DOC035','AED-1286',3),
- ('DOC035','AEF-1031',1),
- ('DOC035','AEF-1031',2),
+ ('DOC035','AED-1286',4),
+ ('DOC035','AED-1286',5),
+ ('DOC035','AED-1286',6),
  ('DOC035','AEF-1031',3),
- -- DOC036 Virginia de la Garza Guadarrama · horario 10-12 · 1 materia(s)
+ ('DOC035','AEF-1031',4),
+ ('DOC035','AEF-1031',5),
+ ('DOC035','AEF-1031',6),
+ -- DOC036 Virginia de la Garza Guadarrama · horario 09-14 · 1 materia(s)
+ ('DOC036','ACF-0903',2),
  ('DOC036','ACF-0903',3),
  ('DOC036','ACF-0903',4),
- -- DOC037 Heidy Marianne Vazquez Espinosa · horario 08-10 · 2 materia(s)
- ('DOC037','SCC-1005',1),
+ ('DOC036','ACF-0903',5),
+ ('DOC036','ACF-0903',6),
+ -- DOC037 Heidy Marianne Vazquez Espinosa · horario 09-13 · 2 materia(s)
  ('DOC037','SCC-1005',2),
- ('DOC037','AEC-1008',1),
+ ('DOC037','SCC-1005',3),
+ ('DOC037','SCC-1005',4),
+ ('DOC037','SCC-1005',5),
  ('DOC037','AEC-1008',2),
- -- DOC038 Laura Angélica Cegobiano García · horario 09-12 · 4 materia(s)
- ('DOC038','SCC-1005',2),
- ('DOC038','SCC-1005',3),
+ ('DOC037','AEC-1008',3),
+ ('DOC037','AEC-1008',4),
+ ('DOC037','AEC-1008',5),
+ -- DOC038 Laura Angélica Cegobiano García · horario 11-14 · 4 materia(s)
  ('DOC038','SCC-1005',4),
- ('DOC038','SCC-1007',2),
- ('DOC038','SCC-1007',3),
+ ('DOC038','SCC-1005',5),
+ ('DOC038','SCC-1005',6),
  ('DOC038','SCC-1007',4),
- ('DOC038','ACD-0908',2),
- ('DOC038','ACD-0908',3),
+ ('DOC038','SCC-1007',5),
+ ('DOC038','SCC-1007',6),
  ('DOC038','ACD-0908',4),
- ('DOC038','SCD-1011',2),
- ('DOC038','SCD-1011',3),
+ ('DOC038','ACD-0908',5),
+ ('DOC038','ACD-0908',6),
  ('DOC038','SCD-1011',4),
- -- DOC039 Hector Carreón Ortiz · horario 08-12 · 2 materia(s)
+ ('DOC038','SCD-1011',5),
+ ('DOC038','SCD-1011',6),
+ -- DOC039 Hector Carreón Ortiz · horario 08-14 · 2 materia(s)
  ('DOC039','AEF-1052',1),
  ('DOC039','AEF-1052',2),
  ('DOC039','AEF-1052',3),
  ('DOC039','AEF-1052',4),
+ ('DOC039','AEF-1052',5),
+ ('DOC039','AEF-1052',6),
  ('DOC039','SCC-1017',1),
  ('DOC039','SCC-1017',2),
  ('DOC039','SCC-1017',3),
  ('DOC039','SCC-1017',4),
- -- DOC040 Susana Hetandez Toledo · horario 08-10 · 1 materia(s)
- ('DOC040','AEF-1052',1),
+ ('DOC039','SCC-1017',5),
+ ('DOC039','SCC-1017',6),
+ -- DOC040 Susana Hetandez Toledo · horario 09-13 · 1 materia(s)
  ('DOC040','AEF-1052',2),
+ ('DOC040','AEF-1052',3),
+ ('DOC040','AEF-1052',4),
+ ('DOC040','AEF-1052',5),
  -- DOC041 Lucerito Zagal Salgado · horario 08-12 · 2 materia(s)
  ('DOC041','SCF-1006',1),
  ('DOC041','SCF-1006',2),
@@ -317,212 +548,263 @@ FROM (VALUES
  ('DOC041','AEF-1052',2),
  ('DOC041','AEF-1052',3),
  ('DOC041','AEF-1052',4),
- -- DOC042 Ashlee Evelin Robles Gallegos · horario 08-11 · 1 materia(s)
- ('DOC042','SCF-1006',1),
- ('DOC042','SCF-1006',2),
+ -- DOC042 Ashlee Evelin Robles Gallegos · horario 10-14 · 1 materia(s)
  ('DOC042','SCF-1006',3),
- -- DOC043 Elam Moreno Mozo · horario 08-11 · 1 materia(s)
+ ('DOC042','SCF-1006',4),
+ ('DOC042','SCF-1006',5),
+ ('DOC042','SCF-1006',6),
+ -- DOC043 Elam Moreno Mozo · horario 08-12 · 1 materia(s)
  ('DOC043','SCF-1006',1),
  ('DOC043','SCF-1006',2),
  ('DOC043','SCF-1006',3),
- -- DOC044 María Eugenía Bermudez Jimenez · horario 09-12 · 1 materia(s)
- ('DOC044','SCF-1006',2),
- ('DOC044','SCF-1006',3),
+ ('DOC043','SCF-1006',4),
+ -- DOC044 María Eugenía Bermudez Jimenez · horario 11-14 · 1 materia(s)
  ('DOC044','SCF-1006',4),
- -- DOC045 Jesus Luna Gonzales · horario 08-11 · 1 materia(s)
- ('DOC045','ACF-0904',1),
- ('DOC045','ACF-0904',2),
+ ('DOC044','SCF-1006',5),
+ ('DOC044','SCF-1006',6),
+ -- DOC045 Jesus Luna Gonzales · horario 10-14 · 1 materia(s)
  ('DOC045','ACF-0904',3),
- -- DOC046 Jesus Francisco Hernadez Aguilar · horario 08-12 · 2 materia(s)
+ ('DOC045','ACF-0904',4),
+ ('DOC045','ACF-0904',5),
+ ('DOC045','ACF-0904',6),
+ -- DOC046 Jesus Francisco Hernadez Aguilar · horario 08-14 · 2 materia(s)
  ('DOC046','ACF-0904',1),
  ('DOC046','ACF-0904',2),
  ('DOC046','ACF-0904',3),
  ('DOC046','ACF-0904',4),
+ ('DOC046','ACF-0904',5),
+ ('DOC046','ACF-0904',6),
  ('DOC046','ACF-0905',1),
  ('DOC046','ACF-0905',2),
  ('DOC046','ACF-0905',3),
  ('DOC046','ACF-0905',4),
+ ('DOC046','ACF-0905',5),
+ ('DOC046','ACF-0905',6),
  -- DOC047 Juan Antonio Piña Acosta · horario 08-11 · 1 materia(s)
  ('DOC047','AEC-1058',1),
  ('DOC047','AEC-1058',2),
  ('DOC047','AEC-1058',3),
- -- DOC048 Sandy Denisse Ramirez Zatarain · horario 08-10 · 1 materia(s)
+ -- DOC048 Sandy Denisse Ramirez Zatarain · horario 08-13 · 1 materia(s)
  ('DOC048','AEC-1058',1),
  ('DOC048','AEC-1058',2),
- -- DOC049 Hector Daniel Ibarra Prieto · horario 09-12 · 1 materia(s)
- ('DOC049','AEC-1058',2),
- ('DOC049','AEC-1058',3),
+ ('DOC048','AEC-1058',3),
+ ('DOC048','AEC-1058',4),
+ ('DOC048','AEC-1058',5),
+ -- DOC049 Hector Daniel Ibarra Prieto · horario 11-14 · 1 materia(s)
  ('DOC049','AEC-1058',4),
- -- DOC050 Diego Saúl Vasquez Rios · horario 08-11 · 5 materia(s)
- ('DOC050','AEC-1058',1),
- ('DOC050','AEC-1058',2),
+ ('DOC049','AEC-1058',5),
+ ('DOC049','AEC-1058',6),
+ -- DOC050 Diego Saúl Vasquez Rios · horario 10-14 · 5 materia(s)
  ('DOC050','AEC-1058',3),
- ('DOC050','ACD-0908',1),
- ('DOC050','ACD-0908',2),
+ ('DOC050','AEC-1058',4),
+ ('DOC050','AEC-1058',5),
+ ('DOC050','AEC-1058',6),
  ('DOC050','ACD-0908',3),
- ('DOC050','SCD-1011',1),
- ('DOC050','SCD-1011',2),
+ ('DOC050','ACD-0908',4),
+ ('DOC050','ACD-0908',5),
+ ('DOC050','ACD-0908',6),
  ('DOC050','SCD-1011',3),
- ('DOC050','SCC-1019',1),
- ('DOC050','SCC-1019',2),
+ ('DOC050','SCD-1011',4),
+ ('DOC050','SCD-1011',5),
+ ('DOC050','SCD-1011',6),
  ('DOC050','SCC-1019',3),
- ('DOC050','SCG-1009',1),
- ('DOC050','SCG-1009',2),
+ ('DOC050','SCC-1019',4),
+ ('DOC050','SCC-1019',5),
+ ('DOC050','SCC-1019',6),
  ('DOC050','SCG-1009',3),
- -- DOC051 Luz María de la Rosa Romo · horario 10-12 · 1 materia(s)
- ('DOC051','AEC-1058',3),
- ('DOC051','AEC-1058',4),
- -- DOC052 Sergio Armando Bueno Martínez · horario 08-12 · 1 materia(s)
+ ('DOC050','SCG-1009',4),
+ ('DOC050','SCG-1009',5),
+ ('DOC050','SCG-1009',6),
+ -- DOC051 Luz María de la Rosa Romo · horario 08-10 · 1 materia(s)
+ ('DOC051','AEC-1058',1),
+ ('DOC051','AEC-1058',2),
+ -- DOC052 Sergio Armando Bueno Martínez · horario 08-14 · 1 materia(s)
  ('DOC052','SCC-1013',1),
  ('DOC052','SCC-1013',2),
  ('DOC052','SCC-1013',3),
  ('DOC052','SCC-1013',4),
- -- DOC053 Cristian Martina Rueda Arredondo · horario 08-11 · 1 materia(s)
- ('DOC053','SCC-1013',1),
- ('DOC053','SCC-1013',2),
+ ('DOC052','SCC-1013',5),
+ ('DOC052','SCC-1013',6),
+ -- DOC053 Cristian Martina Rueda Arredondo · horario 10-14 · 1 materia(s)
  ('DOC053','SCC-1013',3),
- -- DOC054 Fernando Armando Villalbazo Gomez · horario 10-12 · 1 materia(s)
- ('DOC054','SCD-1018',3),
- ('DOC054','SCD-1018',4),
- -- DOC055 Abel Murillo Montaño · horario 08-11 · 1 materia(s)
- ('DOC055','SCD-1018',1),
- ('DOC055','SCD-1018',2),
+ ('DOC053','SCC-1013',4),
+ ('DOC053','SCC-1013',5),
+ ('DOC053','SCC-1013',6),
+ -- DOC054 Fernando Armando Villalbazo Gomez · horario 12-14 · 1 materia(s)
+ ('DOC054','SCD-1018',5),
+ ('DOC054','SCD-1018',6),
+ -- DOC055 Abel Murillo Montaño · horario 10-14 · 1 materia(s)
  ('DOC055','SCD-1018',3),
+ ('DOC055','SCD-1018',4),
+ ('DOC055','SCD-1018',5),
+ ('DOC055','SCD-1018',6),
  -- DOC056 Luis Gonzalo Montoya Villegas · horario 08-11 · 1 materia(s)
  ('DOC056','SCD-1018',1),
  ('DOC056','SCD-1018',2),
  ('DOC056','SCD-1018',3),
- -- DOC057 Sonia Moreno Cabral · horario 08-12 · 2 materia(s)
+ -- DOC057 Sonia Moreno Cabral · horario 08-14 · 2 materia(s)
  ('DOC057','ACF-0905',1),
  ('DOC057','ACF-0905',2),
  ('DOC057','ACF-0905',3),
  ('DOC057','ACF-0905',4),
+ ('DOC057','ACF-0905',5),
+ ('DOC057','ACF-0905',6),
  ('DOC057','ACF-0903',1),
  ('DOC057','ACF-0903',2),
  ('DOC057','ACF-0903',3),
  ('DOC057','ACF-0903',4),
- -- DOC058 María Magdalena Serrano Ortega · horario 08-12 · 1 materia(s)
+ ('DOC057','ACF-0903',5),
+ ('DOC057','ACF-0903',6),
+ -- DOC058 María Magdalena Serrano Ortega · horario 08-14 · 1 materia(s)
  ('DOC058','SCD-1027',1),
  ('DOC058','SCD-1027',2),
  ('DOC058','SCD-1027',3),
  ('DOC058','SCD-1027',4),
- -- DOC059 Gabriela Lourdes Tapia Gonzalez · horario 08-12 · 4 materia(s)
+ ('DOC058','SCD-1027',5),
+ ('DOC058','SCD-1027',6),
+ -- DOC059 Gabriela Lourdes Tapia Gonzalez · horario 08-14 · 4 materia(s)
  ('DOC059','SCD-1027',1),
  ('DOC059','SCD-1027',2),
  ('DOC059','SCD-1027',3),
  ('DOC059','SCD-1027',4),
+ ('DOC059','SCD-1027',5),
+ ('DOC059','SCD-1027',6),
  ('DOC059','SCA-1025',1),
  ('DOC059','SCA-1025',2),
  ('DOC059','SCA-1025',3),
  ('DOC059','SCA-1025',4),
+ ('DOC059','SCA-1025',5),
+ ('DOC059','SCA-1025',6),
  ('DOC059','SCB-1001',1),
  ('DOC059','SCB-1001',2),
  ('DOC059','SCB-1001',3),
  ('DOC059','SCB-1001',4),
+ ('DOC059','SCB-1001',5),
+ ('DOC059','SCB-1001',6),
  ('DOC059','ACA-0909',1),
  ('DOC059','ACA-0909',2),
  ('DOC059','ACA-0909',3),
  ('DOC059','ACA-0909',4),
- -- DOC060 Martha Patricia Ochoa Velardez · horario 08-12 · 1 materia(s)
+ ('DOC059','ACA-0909',5),
+ ('DOC059','ACA-0909',6),
+ -- DOC060 Martha Patricia Ochoa Velardez · horario 08-14 · 1 materia(s)
  ('DOC060','SCC-1017',1),
  ('DOC060','SCC-1017',2),
  ('DOC060','SCC-1017',3),
  ('DOC060','SCC-1017',4),
- -- DOC061 Luis Maribel Guerrero · horario 08-10 · 1 materia(s)
- ('DOC061','SCC-1017',1),
+ ('DOC060','SCC-1017',5),
+ ('DOC060','SCC-1017',6),
+ -- DOC061 Luis Maribel Guerrero · horario 09-13 · 1 materia(s)
  ('DOC061','SCC-1017',2),
- -- DOC062 Diana Lisseth Bravo Castro · horario 10-12 · 1 materia(s)
- ('DOC062','AEF-1031',3),
- ('DOC062','AEF-1031',4),
- -- DOC063 María Concepción Ibarra Gamiz · horario 08-12 · 1 materia(s)
+ ('DOC061','SCC-1017',3),
+ ('DOC061','SCC-1017',4),
+ ('DOC061','SCC-1017',5),
+ -- DOC062 Diana Lisseth Bravo Castro · horario 08-10 · 1 materia(s)
+ ('DOC062','AEF-1031',1),
+ ('DOC062','AEF-1031',2),
+ -- DOC063 María Concepción Ibarra Gamiz · horario 08-14 · 1 materia(s)
  ('DOC063','SCD-1022',1),
  ('DOC063','SCD-1022',2),
  ('DOC063','SCD-1022',3),
  ('DOC063','SCD-1022',4),
- -- DOC064 Juan José Rogelio Orozco Garibay · horario 09-12 · 2 materia(s)
- ('DOC064','SCD-1022',2),
- ('DOC064','SCD-1022',3),
+ ('DOC063','SCD-1022',5),
+ ('DOC063','SCD-1022',6),
+ -- DOC064 Juan José Rogelio Orozco Garibay · horario 11-14 · 2 materia(s)
  ('DOC064','SCD-1022',4),
- ('DOC064','SCA-1025',2),
- ('DOC064','SCA-1025',3),
+ ('DOC064','SCD-1022',5),
+ ('DOC064','SCD-1022',6),
  ('DOC064','SCA-1025',4),
- -- DOC065 Miguel Angel López Ramirez · horario 08-11 · 1 materia(s)
- ('DOC065','SCD-1003',1),
- ('DOC065','SCD-1003',2),
+ ('DOC064','SCA-1025',5),
+ ('DOC064','SCA-1025',6),
+ -- DOC065 Miguel Angel López Ramirez · horario 10-14 · 1 materia(s)
  ('DOC065','SCD-1003',3),
- -- DOC066 Humberto Raiz Orozco · horario 08-11 · 1 materia(s)
- ('DOC066','SCC-1010',1),
- ('DOC066','SCC-1010',2),
+ ('DOC065','SCD-1003',4),
+ ('DOC065','SCD-1003',5),
+ ('DOC065','SCD-1003',6),
+ -- DOC066 Humberto Raiz Orozco · horario 10-14 · 1 materia(s)
  ('DOC066','SCC-1010',3),
- -- DOC067 Cynthia Peraza Ramirez · horario 08-12 · 1 materia(s)
+ ('DOC066','SCC-1010',4),
+ ('DOC066','SCC-1010',5),
+ ('DOC066','SCC-1010',6),
+ -- DOC067 Cynthia Peraza Ramirez · horario 08-14 · 1 materia(s)
  ('DOC067','SCC-1010',1),
  ('DOC067','SCC-1010',2),
  ('DOC067','SCC-1010',3),
  ('DOC067','SCC-1010',4),
- -- DOC068 Sergio Contreras Hernandez · horario 10-12 · 2 materia(s)
- ('DOC068','AEC-1034',3),
- ('DOC068','AEC-1034',4),
- ('DOC068','SCA-1002',3),
- ('DOC068','SCA-1002',4),
- -- DOC069 Christian Alonso Arenas Campis · horario 09-12 · 3 materia(s)
- ('DOC069','AEC-1034',2),
- ('DOC069','AEC-1034',3),
+ ('DOC067','SCC-1010',5),
+ ('DOC067','SCC-1010',6),
+ -- DOC068 Sergio Contreras Hernandez · horario 08-10 · 2 materia(s)
+ ('DOC068','AEC-1034',1),
+ ('DOC068','AEC-1034',2),
+ ('DOC068','SCA-1002',1),
+ ('DOC068','SCA-1002',2),
+ -- DOC069 Christian Alonso Arenas Campis · horario 11-14 · 3 materia(s)
  ('DOC069','AEC-1034',4),
- ('DOC069','AEC-1061',2),
- ('DOC069','AEC-1061',3),
+ ('DOC069','AEC-1034',5),
+ ('DOC069','AEC-1034',6),
  ('DOC069','AEC-1061',4),
- ('DOC069','SCD-1021',2),
- ('DOC069','SCD-1021',3),
+ ('DOC069','AEC-1061',5),
+ ('DOC069','AEC-1061',6),
  ('DOC069','SCD-1021',4),
- -- DOC070 Erasmo Estrada Peña · horario 08-11 · 3 materia(s)
- ('DOC070','AEC-1061',1),
- ('DOC070','AEC-1061',2),
+ ('DOC069','SCD-1021',5),
+ ('DOC069','SCD-1021',6),
+ -- DOC070 Erasmo Estrada Peña · horario 10-14 · 3 materia(s)
  ('DOC070','AEC-1061',3),
- ('DOC070','SCD-1015',1),
- ('DOC070','SCD-1015',2),
+ ('DOC070','AEC-1061',4),
+ ('DOC070','AEC-1061',5),
+ ('DOC070','AEC-1061',6),
  ('DOC070','SCD-1015',3),
- ('DOC070','SCD-1016',1),
- ('DOC070','SCD-1016',2),
+ ('DOC070','SCD-1015',4),
+ ('DOC070','SCD-1015',5),
+ ('DOC070','SCD-1015',6),
  ('DOC070','SCD-1016',3),
- -- DOC071 Rene Solis Reyes · horario 08-11 · 3 materia(s)
- ('DOC071','SCA-1025',1),
- ('DOC071','SCA-1025',2),
+ ('DOC070','SCD-1016',4),
+ ('DOC070','SCD-1016',5),
+ ('DOC070','SCD-1016',6),
+ -- DOC071 Rene Solis Reyes · horario 10-14 · 3 materia(s)
  ('DOC071','SCA-1025',3),
- ('DOC071','SCC-1014',1),
- ('DOC071','SCC-1014',2),
+ ('DOC071','SCA-1025',4),
+ ('DOC071','SCA-1025',5),
+ ('DOC071','SCA-1025',6),
  ('DOC071','SCC-1014',3),
- ('DOC071','SCC-1023',1),
- ('DOC071','SCC-1023',2),
+ ('DOC071','SCC-1014',4),
+ ('DOC071','SCC-1014',5),
+ ('DOC071','SCC-1014',6),
  ('DOC071','SCC-1023',3),
- -- DOC072 Reynaldo Andres Salas Carmona · horario 10-12 · 1 materia(s)
- ('DOC072','SCC-1007',3),
- ('DOC072','SCC-1007',4),
+ ('DOC071','SCC-1023',4),
+ ('DOC071','SCC-1023',5),
+ ('DOC071','SCC-1023',6),
+ -- DOC072 Reynaldo Andres Salas Carmona · horario 12-14 · 1 materia(s)
+ ('DOC072','SCC-1007',5),
+ ('DOC072','SCC-1007',6),
  -- DOC073 Daniel Alfredo Loreto Gomez · horario 10-12 · 1 materia(s)
  ('DOC073','ACD-0908',3),
  ('DOC073','ACD-0908',4),
- -- DOC074 Luis Alfonso Gaxiola Vega · horario 09-12 · 4 materia(s)
+ -- DOC074 Luis Alfonso Gaxiola Vega · horario 08-11 · 4 materia(s)
+ ('DOC074','SCD-1015',1),
  ('DOC074','SCD-1015',2),
  ('DOC074','SCD-1015',3),
- ('DOC074','SCD-1015',4),
+ ('DOC074','SCD-1016',1),
  ('DOC074','SCD-1016',2),
  ('DOC074','SCD-1016',3),
- ('DOC074','SCD-1016',4),
+ ('DOC074','SCC-1019',1),
  ('DOC074','SCC-1019',2),
  ('DOC074','SCC-1019',3),
- ('DOC074','SCC-1019',4),
+ ('DOC074','SCC-1023',1),
  ('DOC074','SCC-1023',2),
  ('DOC074','SCC-1023',3),
- ('DOC074','SCC-1023',4),
- -- DOC075 Jesus Ricardo Palma Valdez · horario 09-12 · 2 materia(s)
+ -- DOC075 Jesus Ricardo Palma Valdez · horario 08-11 · 2 materia(s)
+ ('DOC075','SCD-1021',1),
  ('DOC075','SCD-1021',2),
  ('DOC075','SCD-1021',3),
- ('DOC075','SCD-1021',4),
+ ('DOC075','SCD-1004',1),
  ('DOC075','SCD-1004',2),
  ('DOC075','SCD-1004',3),
- ('DOC075','SCD-1004',4),
- -- DOC076 Fevrier Adolfo Valdez Acosta · horario 08-10 · 1 materia(s)
- ('DOC076','SCD-1021',1),
+ -- DOC076 Fevrier Adolfo Valdez Acosta · horario 09-13 · 1 materia(s)
  ('DOC076','SCD-1021',2),
+ ('DOC076','SCD-1021',3),
+ ('DOC076','SCD-1021',4),
+ ('DOC076','SCD-1021',5),
  -- DOC077 Rodrigo Leonardo Reyes Osorio · horario 08-12 · 2 materia(s)
  ('DOC077','SCA-1026',1),
  ('DOC077','SCA-1026',2),
@@ -532,58 +814,72 @@ FROM (VALUES
  ('DOC077','SCG-1009',2),
  ('DOC077','SCG-1009',3),
  ('DOC077','SCG-1009',4),
- -- DOC078 Hector Javier Hinojosa Galván · horario 09-11 · 1 materia(s)
+ -- DOC078 Hector Javier Hinojosa Galván · horario 08-13 · 1 materia(s)
+ ('DOC078','SCD-1011',1),
  ('DOC078','SCD-1011',2),
  ('DOC078','SCD-1011',3),
+ ('DOC078','SCD-1011',4),
+ ('DOC078','SCD-1011',5),
  -- DOC079 Daniela Adriana Sanchez Vizcarra · horario 08-11 · 1 materia(s)
  ('DOC079','ACA-0909',1),
  ('DOC079','ACA-0909',2),
  ('DOC079','ACA-0909',3),
- -- DOC080 Hector Alonso Miramontes Miramontes · horario 08-11 · 2 materia(s)
- ('DOC080','SCC-1023',1),
- ('DOC080','SCC-1023',2),
+ -- DOC080 Hector Alonso Miramontes Miramontes · horario 10-14 · 2 materia(s)
  ('DOC080','SCC-1023',3),
- ('DOC080','SCA-1002',1),
- ('DOC080','SCA-1002',2),
+ ('DOC080','SCC-1023',4),
+ ('DOC080','SCC-1023',5),
+ ('DOC080','SCC-1023',6),
  ('DOC080','SCA-1002',3),
- -- DOC081 Octavio Romero Flores · horario 10-12 · 1 materia(s)
- ('DOC081','AEB-1055',3),
- ('DOC081','AEB-1055',4),
- -- DOC082 Jose Jonathan Perez Castro · horario 08-11 · 1 materia(s)
- ('DOC082','AEB-1055',1),
- ('DOC082','AEB-1055',2),
+ ('DOC080','SCA-1002',4),
+ ('DOC080','SCA-1002',5),
+ ('DOC080','SCA-1002',6),
+ -- DOC081 Octavio Romero Flores · horario 08-10 · 1 materia(s)
+ ('DOC081','AEB-1055',1),
+ ('DOC081','AEB-1055',2),
+ -- DOC082 Jose Jonathan Perez Castro · horario 10-14 · 1 materia(s)
  ('DOC082','AEB-1055',3),
- -- DOC083 Ray Brunett Parra Galaviz · horario 08-12 · 1 materia(s)
+ ('DOC082','AEB-1055',4),
+ ('DOC082','AEB-1055',5),
+ ('DOC082','AEB-1055',6),
+ -- DOC083 Ray Brunett Parra Galaviz · horario 08-14 · 1 materia(s)
  ('DOC083','AEB-1055',1),
  ('DOC083','AEB-1055',2),
  ('DOC083','AEB-1055',3),
  ('DOC083','AEB-1055',4),
- -- DOC084 Jose Mario García Valdez · horario 08-12 · 1 materia(s)
+ ('DOC083','AEB-1055',5),
+ ('DOC083','AEB-1055',6),
+ -- DOC084 Jose Mario García Valdez · horario 08-14 · 1 materia(s)
  ('DOC084','AEB-1055',1),
  ('DOC084','AEB-1055',2),
  ('DOC084','AEB-1055',3),
  ('DOC084','AEB-1055',4),
- -- DOC086 Bogart Yail Marquez Lobato · horario 08-12 · 1 materia(s)
+ ('DOC084','AEB-1055',5),
+ ('DOC084','AEB-1055',6),
+ -- DOC086 Bogart Yail Marquez Lobato · horario 08-14 · 1 materia(s)
  ('DOC086','ACA-0910',1),
  ('DOC086','ACA-0910',2),
  ('DOC086','ACA-0910',3),
  ('DOC086','ACA-0910',4),
- -- DOC087 Arnulfo Alanis Garza · horario 09-12 · 1 materia(s)
+ ('DOC086','ACA-0910',5),
+ ('DOC086','ACA-0910',6),
+ -- DOC087 Arnulfo Alanis Garza · horario 09-13 · 1 materia(s)
  ('DOC087','SCC-1002',2),
  ('DOC087','SCC-1002',3),
- ('DOC087','SCC-1002',4)
+ ('DOC087','SCC-1002',4),
+ ('DOC087','SCC-1002',5)
 ) v(Maestro, Materia, Bloque)
 JOIN Periodo p  ON p.Clave = N'AGO-DIC 2026'
 JOIN Maestro mt ON mt.Clave = v.Maestro
 JOIN Materia ma ON ma.Clave = v.Materia;
 
-EXEC sp_set_session_context @key = N'Origen', @value = NULL;
 COMMIT TRANSACTION;
 GO
 
 /* ---------- VERIFICACION: cada fila debe coincidir con 'Esperado' ---------- */
 SELECT 'Materias' AS Tabla, COUNT(*) AS Filas, 46 AS Esperado FROM Materia
 UNION ALL SELECT 'Maestros',        COUNT(*), 85 FROM Maestro
-UNION ALL SELECT 'Slots',           COUNT(*), 24 FROM PaqueteMateria
-UNION ALL SELECT 'Disponibilidad',  COUNT(*), 450 FROM MaestroMateriaBloque;
+UNION ALL SELECT 'Bloques',         COUNT(*), 6  FROM Bloque
+UNION ALL SELECT 'Paquetes',        COUNT(*), 19 FROM Paquete
+UNION ALL SELECT 'Slots',           COUNT(*), 112 FROM PaqueteMateria
+UNION ALL SELECT 'Disponibilidad',  COUNT(*), 614 FROM MaestroMateriaBloque;
 GO
