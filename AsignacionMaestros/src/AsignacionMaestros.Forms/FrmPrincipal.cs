@@ -12,11 +12,11 @@ public sealed class FrmPrincipal : Form
 {
     private readonly Repositorio _repo;
 
-    // Controles de la interfaz
     private readonly ComboBox _cmbPeriodo = new() { DropDownStyle = ComboBoxStyle.DropDownList, Width = 160 };
     private readonly Button _btnAsignar = new() { Text = "Asignar pendientes", AutoSize = true };
     private readonly Button _btnReoptimizar = new() { Text = "Reoptimizar todo", AutoSize = true };
-    private readonly Button _btnCambiar = new() { Text = "Cambiar maestro…", AutoSize = true, Enabled = false, Margin = new Padding(24, 3, 3, 3) };   
+    private readonly Button _btnCambiar = new() { Text = "Cambiar maestro…", AutoSize = true, Enabled = false, Margin = new Padding(24, 3, 3, 3) };   // NUEVO
+    private readonly Button _btnDisponibilidad = new() { Text = "Disponibilidad…", AutoSize = true };   // NUEVO
     private readonly Button _btnLimpiar = new() { Text = "Limpiar horarios", AutoSize = true, Margin = new Padding(24, 3, 3, 3) };
     private readonly Button _btnRecargar = new() { Text = "Recargar", AutoSize = true };
     private readonly ToolStripStatusLabel _lblEstado = new();
@@ -31,7 +31,6 @@ public sealed class FrmPrincipal : Form
     private List<Maestro> _maestros = new();
     private bool _cargando;
 
-    // Constructor
     public FrmPrincipal(Repositorio repo)
     {
         // Se inyecta el repositorio de datos para que la pantalla pueda cargar y guardar información
@@ -50,7 +49,8 @@ public sealed class FrmPrincipal : Form
         panel.Controls.Add(_cmbPeriodo);
         panel.Controls.Add(_btnAsignar);
         panel.Controls.Add(_btnReoptimizar);
-        panel.Controls.Add(_btnCambiar);   
+        panel.Controls.Add(_btnCambiar);   // NUEVO
+        panel.Controls.Add(_btnDisponibilidad);   // NUEVO
         panel.Controls.Add(_btnLimpiar);
         panel.Controls.Add(_btnRecargar);
 
@@ -67,12 +67,13 @@ public sealed class FrmPrincipal : Form
         _btnRecargar.Click += (_, _) => Recargar();
         _btnAsignar.Click += (_, _) => Ejecutar(ModoAsignacion.Conservador);
         _btnReoptimizar.Click += (_, _) => Ejecutar(ModoAsignacion.Reoptimizar);
-        _btnCambiar.Click += (_, _) => CambiarManual();                                                   
-        _grid.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) CambiarManual(); };                      
-        _grid.SelectionChanged += (_, _) => _btnCambiar.Enabled = _grid.CurrentRow?.Tag is Slot;          
+        _btnCambiar.Click += (_, _) => CambiarManual();                                                    // NUEVO
+        _grid.CellDoubleClick += (_, e) => { if (e.RowIndex >= 0) CambiarManual(); };                      // NUEVO
+        _grid.SelectionChanged += (_, _) => _btnCambiar.Enabled = _grid.CurrentRow?.Tag is Slot;          // NUEVO
+        _btnDisponibilidad.Click += (_, _) => VerDisponibilidad();   // NUEVO
         _btnLimpiar.Click += (_, _) => Limpiar();
     }
-    // Propiedad que devuelve el periodo actualmente seleccionado en el combo
+
     private PeriodoItem? PeriodoActual => _cmbPeriodo.SelectedItem as PeriodoItem;
 
     // ---------- Cargar y mostrar datos ----------
@@ -108,7 +109,7 @@ public sealed class FrmPrincipal : Form
         foreach (var s in _slots)
         {
             var i = _grid.Rows.Add(s.Paquete, s.Materia, s.Hora, NombreMaestro(s.IdMaestro), s.Estado.ToString(), s.Motivo);
-            _grid.Rows[i].Tag = s;   // así la fila siempre sabe qué slot es, aunque el usuario ordene la tabla
+            _grid.Rows[i].Tag = s;   // NUEVO: así la fila siempre sabe qué slot es, aunque el usuario ordene la tabla
             _grid.Rows[i].DefaultCellStyle.BackColor = s.Estado switch
             {
                 EstadoSlot.Asignado => Color.Honeydew,
@@ -118,7 +119,7 @@ public sealed class FrmPrincipal : Form
         }
         var pend = _slots.Count(s => s.Estado == EstadoSlot.Pendiente);
         _lblEstado.Text = $"{_slots.Count - pend} asignados · {pend} pendientes";
-        _btnCambiar.Enabled = _grid.CurrentRow?.Tag is Slot;   
+        _btnCambiar.Enabled = _grid.CurrentRow?.Tag is Slot;   // NUEVO
     }
 
     // Devuelve el nombre del maestro con su clave, o "—" si no hay maestro
@@ -137,7 +138,7 @@ public sealed class FrmPrincipal : Form
         catch (Exception ex) { Error("No se pudo asignar", ex); }
     }
 
-    // ---------- cambio manual ----------
+    // ---------- NUEVO: cambio manual ----------
     private void CambiarManual()
     {
         if (_grid.CurrentRow?.Tag is not Slot elegido) return;
@@ -164,7 +165,7 @@ public sealed class FrmPrincipal : Form
         catch (Exception ex) { Error("No se pudo hacer el cambio", ex); }
     }
 
-    // Valida, muestra la vista previa y, si el usuario acepta, guarda solo la diferencia.
+    /// <summary>Valida, muestra la vista previa y, si el usuario acepta, guarda solo la diferencia.</summary>
     private bool ConfirmarYGuardar(ResultadoAsignacion resultado, string origen)
     {
         var errores = Asignador.Validar(resultado.Slots, _maestros);
@@ -201,6 +202,19 @@ public sealed class FrmPrincipal : Form
         _repo.GuardarCambios(resultado.Cambios, origen);
         Recargar();
         return true;
+    }
+
+    // ---------- NUEVO: disponibilidad de todos los maestros ----------
+    private void VerDisponibilidad()
+    {
+        try
+        {
+            var materias = _repo.CargarMaterias();
+            var bloques = _repo.CargarBloques();
+            using var frm = new FrmDisponibilidad(_maestros, _slots, materias, bloques);
+            frm.ShowDialog(this);
+        }
+        catch (Exception ex) { Error("No se pudo mostrar la disponibilidad", ex); }
     }
 
     // ---------- Limpiar ----------

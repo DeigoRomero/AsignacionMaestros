@@ -8,6 +8,9 @@ public sealed record PeriodoItem(int Id, string Clave)
     public override string ToString() => Clave;   // lo que muestra el ComboBox
 }
 
+public sealed record MateriaItem(int Id, string Clave, string Nombre);
+public sealed record BloqueItem(int Id, string Etiqueta);   // ej. (1, "08-09")
+
 /// <summary>Único lugar que habla con SQL Server. El resto de la app usa solo el Core.</summary>
 public sealed class Repositorio
 {
@@ -28,6 +31,30 @@ public sealed class Repositorio
         using var rd = cmd.ExecuteReader();
         var lista = new List<PeriodoItem>();
         while (rd.Read()) lista.Add(new PeriodoItem(rd.GetInt32(0), rd.GetString(1)));
+        return lista;
+    }
+
+    public List<MateriaItem> CargarMaterias()
+    {
+        using var cn = Abrir();
+        using var cmd = new SqlCommand("SELECT IdMateria, Clave, Nombre FROM Materia ORDER BY Clave", cn);
+        using var rd = cmd.ExecuteReader();
+        var lista = new List<MateriaItem>();
+        while (rd.Read()) lista.Add(new MateriaItem(rd.GetInt32(0), rd.GetString(1), rd.GetString(2)));
+        return lista;
+    }
+
+    public List<BloqueItem> CargarBloques()
+    {
+        const string sql = @"
+SELECT IdBloque,
+       LEFT(CONVERT(varchar(8), HoraInicio, 108), 2) + '-' + LEFT(CONVERT(varchar(8), HoraFin, 108), 2)
+FROM   Bloque ORDER BY IdBloque";
+        using var cn = Abrir();
+        using var cmd = new SqlCommand(sql, cn);
+        using var rd = cmd.ExecuteReader();
+        var lista = new List<BloqueItem>();
+        while (rd.Read()) lista.Add(new BloqueItem(rd.GetByte(0), rd.GetString(1)));   // TINYINT -> byte
         return lista;
     }
 

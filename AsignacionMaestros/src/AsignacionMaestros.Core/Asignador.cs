@@ -34,7 +34,7 @@ public static class Asignador
         // Flexibilidad: a cuántos slots pendientes puede servir cada maestro (menos = más limitado).
         var flexibilidad = maestros.ToDictionary(m => m.Id, m => candidatos.Values.Count(l => l.Contains(m)));
 
-        // Paso 3: una hora a la vez, con caminos aumentantes (Kuhn).
+        // Paso 3: una hora a la vez, con caminos aumentantes (Algoritmo de Kuhn).
         foreach (var grupo in pendientes.GroupBy(s => s.Bloque).OrderBy(g => g.Key))
         {
             var dueno = new Dictionary<int, Slot>();   // maestro -> slot que tiene en esta hora
