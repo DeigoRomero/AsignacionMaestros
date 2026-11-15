@@ -234,6 +234,204 @@ UNION ALL SELECT 'Slots',           COUNT(*), 24 FROM PaqueteMateria
 UNION ALL SELECT 'Disponibilidad',  COUNT(*), 76 FROM MaestroMateriaBloque;
 GO
 
-/* ---------- PARA PONER LOS NOMBRES REALES DE LOS MAESTROS ---------- */
--- UPDATE Maestro SET Nombre = N'Nombre real aqui' WHERE Clave = 'DOC001';
--- Nomas que me da flojera jeje
+/*---------------------------------------------------------------
+                    MAESTROS DEL ITT 
+  ---------------------------------------------------------------*/
+/*---------------------------------------------------------------
+                    PRIMER SEMESTRE
+  ---------------------------------------------------------------*/
+
+/* ---------- MAESTROS CÁLCULO DIFERENCIAL ---------- */
+UPDATE Maestro SET Nombre = N'Julio Campos Morales'               WHERE Clave = 'DOC001'; 
+UPDATE Maestro SET Nombre = N'Zenaido Antonio Aguilar De Leon'    WHERE Clave = 'DOC002'; 
+UPDATE Maestro SET Nombre = N'Mariana Huizar Tejeda'              WHERE Clave = 'DOC003'; -- + Cálculo Integral + Cálculo Vectorial + Ecuaciones Diferenciales
+UPDATE Maestro SET Nombre = N'Jose Gerardo Benjamín Mancilla Silva' WHERE Clave = 'DOC004'; -- + Álgebra Lineal
+UPDATE Maestro SET Nombre = N'Selene Laces Valdiviezo'            WHERE Clave = 'DOC005'; -- + Cálculo Integral
+UPDATE Maestro SET Nombre = N'Rogelio Escobedo Mitre'             WHERE Clave = 'DOC006'; -- + Álgebra Lineal + Taller de Sistemas Op.
+
+/* ---------- MAESTROS FUNDAMENTOS DE PROGRAMACIÓN ---------- */
+UPDATE Maestro SET Nombre = N'María Leticia Lomeli Briones'       WHERE Clave = 'DOC007'; -- + Taller de Ética + Cultura Empresarial
+UPDATE Maestro SET Nombre = N'Lizeth Chavira Macias'              WHERE Clave = 'DOC008'; -- + Fund. Investigación + Mat. Discretas + Cultura Empresarial
+UPDATE Maestro SET Nombre = N'José Adolfo Medina Cervantes'       WHERE Clave = 'DOC009'; -- + Fund. Investigación + Poo + Desarrollo Sustentable
+UPDATE Maestro SET Nombre = N'Karina Aidee Romero Alvarado'       WHERE Clave = 'DOC010'; -- + Mat. Discretas
+
+--INSERTAR LOS MAESTROS NUEVOS
+INSERT INTO Maestro (Clave, Nombre)
+SELECT v.Clave, v.Nombre
+FROM (VALUES
+    /* ---------- MAESTROS FUNDAMENTOS DE PROGRAMACIÓN ---------- */
+    ('DOC011', N'Luz Elena Cortés Galvan'), -- + Poo + Estructura de Datos
+    ('DOC012', N'José De Jesus Parra Galaviz'),
+    ('DOC013', N'Marco Antonio Rodriguez Moreno'),
+    /* ---------- MAESTROS FUNDAMENTOS DE INVESTIGACIÓN ---------- */
+    ('DOC014', N'Claudia Negrete Sanchez'),-- + Mat. Discretas + Poo + Estructura de Datos
+    ('DOC015', N'Gabriela Torres Beltrán'), -- + Poo
+    ('DOC016', N'Claudia Ibeth Gonzalez Berrelleza'), -- + Fundamentos de Bases de Datos
+    ('DOC017', N'Jesus Jaime Gonzalez Gonzalez'),
+    ('DOC018', N'Martha Elena Pulido'), -- + Fundamentos de Ingeniería de Software + Ingeniería de Software
+    /* ---------- MAESTROS TALLER DE ADMINISTRACIÓN ---------- */
+    ('DOC019', N'Consuelo Fabiola Fausto Trujillo'),
+    ('DOC020', N'Alma Sofia Flores Rivera'),
+    ('DOC021', N'Marco Jorge Aquino'), -- + Arquitectura de Computadoras
+    ('DOC022', N'Maria de los Angeles Quezada Cisnero'), -- + Tópicos Avanzados de Programación
+    ('DOC023', N'Maria Isabel Renteria Lomeli'), -- + Cultura Empresarial
+    ('DOC024', N'Luz Maria Lugo Mendez'),
+    ('DOC025', N'Rosana Gutierrez Montoya'), -- + Mat. Discretas + Gestión de Proyectos de Software + Taller de Investigación II
+    /* ---------- MAESTROS TALLER DE ÉTICA ---------- */
+    ('DOC026', N'Celia Grisel Escobedo Aparicio'),
+    ('DOC027', N'Cristina Cervantes Vivaldo'),
+    ('DOC028', N'Claudia Selene Loreto Medina'),
+
+    /*---------------------------------------------------------------
+					    SEGUNDO SEMESTRE 
+       ------------------------------------------------------------*/
+
+    /* ---------- MAESTROS CÁLCULO INTEGRAL ---------- */
+    ('DOC029', N'José Alfonso Romero Gandara'), -- + Cálculo Vectorial + Ecuaciones Diferenciales
+    ('DOC030', N'Zenaido Antonio Aguilar de Leon'),
+    ('DOC031', N'Cynthia Ivette Miramontes Ortega'),
+    ('DOC032', N'José Armando Rocha Rocha'), -- + Cálculo Vectorial + Ecuaciones Diferenciales
+    ('DOC033', N'José Enrique Montoya Lopez'),
+
+    /* ---------- MAESTROS POO ---------- */
+    ('DOC034', N'Alejandra Mancilla Soto'),
+    ('DOC035', N'Ramón Antonio Castro Garcia'), -- + Fundamentos de Bases de Datos
+
+    /* ---------- MAESTROS ÁLGEBRA LINEAL ---------- */
+    ('DOC036', N'Virginia de la Garza Guadarrama'),
+    
+    /* ---------- MAESTROS CULTURA EMPRESARIAL ---------- */
+    ('DOC037', N'Heidy Marianne Vazquez Espinosa'), -- + Contabilidad Financiera
+    ('DOC038', N'Laura Angélica Cegobiano García'), -- + Fundamentos de Ingeniería de Software + Desarrollo Sustentable + Ingeniería de Software
+
+    /* ---------- MAESTROS PROBABILIDAD Y ESTADÍSTICA ---------- */
+    ('DOC039', N'Hector Carreón Ortiz'), -- + Métodos Numéricos
+    ('DOC040', N'Susana Hetandez Toledo'),
+
+    /* ---------- MAESTROS FÍSICA GENERAL ---------- */
+    ('DOC041', N'Lucerito Zagal Salgado'), -- + Probabilidad y Estadística
+    ('DOC042', N'Ashlee Evelin Robles Gallegos'),
+    ('DOC043', N'Elam Moreno Mozo'),
+    ('DOC044', N'María Eugenía Bermudez Jimenez'),
+
+    /*---------------------------------------------------------------
+					    TERCER SEMESTRE 
+       ------------------------------------------------------------*/
+
+    /* ---------- MAESTROS CÁLCULO VECTORIAL ---------- */
+    ('DOC045', N'Jesus Luna Gonzales'),
+    ('DOC046', N'Jesus Francisco Hernadez Aguilar'), -- + Ecuaciones Diferenciales
+
+    /* ---------- MAESTROS QUÍMICA ---------- */
+    ('DOC047', N'Juan Antonio Piña Acosta'),
+    ('DOC048', N'Sandy Denisse Ramirez Zatarain'),
+    ('DOC049', N'Hector Daniel Ibarra Prieto'),
+    ('DOC050', N'Diego Saúl Vasquez Rios'),-- + Desarrollo Sustentable + Ingeniería de Software + Programación Lógica y Funcional + Gestión de Proyectos de Software
+    ('DOC051', N'Luz María de la Rosa Romo'),
+
+    /* ---------- MAESTROS INVESTIGACIÓN DE OP. ---------- */
+    ('DOC052', N'Sergio Armando Bueno Martínez'),
+    ('DOC053', N'Cristian Martina Rueda Arredondo'),
+
+    /* ---------- MAESTROS PRINCIPIOS ELÉCTRICOS Y APLICACIONES DIGITALES ---------- */
+    ('DOC054', N'Fernando Armando Villalbazo Gomez'),
+    ('DOC055', N'Abel Murillo Montaño'),
+    ('DOC056', N'Luis Gonzalo Montoya Villegas'),
+
+    /*---------------------------------------------------------------
+					CUARTO SEMESTRE 
+   ------------------------------------------------------------*/
+
+   /* ---------- MAESTROS ECUACIONES DIFERENCIALES ---------- */
+   ('DOC057', N'Sonia Moreno Cabral'), -- + Álgebra Lineal
+  
+  /* ---------- MAESTROS TÓPICOS AVANZADOS DE PROGRAMACIÓN ---------- */
+  ('DOC058', N'María Magdalena Serrano Ortega'),
+  ('DOC059', N'Gabriela Lourdes Tapia Gonzalez'), -- +Taller de Bases de Datos + Administración de Bases de Datos + Taller de Investigación I
+
+  /* ---------- MAESTROS MÉTODOS NÚMERICOS ---------- */
+  ('DOC060', N'Martha Patricia Ochoa Velardez'),
+  ('DOC061', N'Luis Maribel Guerrero'),
+
+  /* ---------- MAESTROS FUNDAMENTOS DE BASES DE DATOS ---------- */
+  ('DOC062', N'Diana Lisseth Bravo Castro'),
+  
+  /* ---------- MAESTROS SIMULACIÓN ---------- */
+  ('DOC063', N'María Concepción Ibarra Gamiz'),
+  ('DOC064', N'Juan José Rogelio Orozco Garibay'), -- + Taller de Bases de Datos
+
+  /* ---------- MAESTROS ARQUITECTURA DE COMPUTADORAS ---------- */
+  ('DOC065', N'Miguel Angel López Ramirez'),
+
+  /*---------------------------------------------------------------
+					QUINTO SEMESTRE 
+   ------------------------------------------------------------*/
+
+  /* ---------- MAESTROS GRAFICACIÓN ---------- */
+  ('DOC066', N'Humberto Raiz Orozco'),
+  ('DOC067', N'Cynthia Peraza Ramirez'),
+
+  /* ---------- MAESTROS FUNDAMENTOS DE TELECOMUNICACIONES ---------- */
+  ('DOC068', N'Sergio Contreras Hernandez'),
+  ('DOC069', N'Christian Alonso Arenas Campis '), -- + Sistemas Operativos I + Redes de Computadoras
+
+  /* ---------- MAESTROS SISTEMAS OPERATIVOS I ---------- */
+  ('DOC070', N'Erasmo Estrada Peña'), -- + Lenguajes y Autómatas I + Lenguajes y Autómatas II
+
+  /* ---------- MAESTROS TALLER DE BASE DE DATOS ---------- */
+  ('DOC071', N'Rene Solis Reyes'), -- + Lenguaje de Interfaz + Sistemas Programables
+
+  /* ---------- MAESTROS FUNDAMENTOS DE INGENIERÍA DE SOFTWARE ---------- */
+  ('DOC072', N'Reynaldo Andres Salas Carmona'),
+  
+  /* ---------- MAESTROS DESARROLLO SUSTENTABLE ---------- */
+  ('DOC073', N'Daniel Alfredo Loreto Gomez'),
+
+  /*---------------------------------------------------------------
+					SEXTO SEMESTRE 
+   ------------------------------------------------------------*/
+
+   /* ---------- MAESTROS LENGUAJES Y AUTÓMATAS I ---------- */
+  ('DOC074', N'Luis Alfonso Gaxiola Vega'), -- + Lenguajes y Autómatas II + Programación Lógica y Funcional + Sistemas Programables
+
+  /* ---------- MAESTROS REDES DE COMPUTADORAS ---------- */
+  ('DOC075', N'Jesus Ricardo Palma Valdez'), -- + Comunicación y Enrutamiento en Redes de Datos
+  ('DOC076', N'Fevrier Adolfo Valdez Acosta'),
+
+  /* ---------- TALLER DE SISTEMAS OPERATIVOS ---------- */
+  ('DOC077', N'Rodrigo Leonardo Reyes Osorio'),-- + Gestión de Proyectos de Software
+
+  /* ---------- MAESTROS INGENIERÍA DE SOFTWARE ---------- */
+  ('DOC078', N'Hector Javier Hinojosa Galván'),
+
+  /*---------------------------------------------------------------
+					SÉPTIMO SEMESTRE 
+   ------------------------------------------------------------*/
+
+  /* ---------- MAESTROS TALLER DE INVESTIGACIÓN I ---------- */
+  ('DOC079', N'Daniela Adriana Sanchez Vizcarra'), 
+
+  /* ---------- MAESTROS SISTEMAS PROGRAMABLES ---------- */
+  ('DOC080', N'Hector Alonso Miramontes Miramontes'), -- + Administración de Redes
+
+    /*---------------------------------------------------------------
+					OCTAVO SEMESTRE 
+   ------------------------------------------------------------*/
+
+   /* ---------- MAESTROS PROGRAMACIÓN WEB ---------- */
+   ('DOC081', N'Octavio Romero Flores'),
+   ('DOC082', N'Jose Jonathan Perez Castro'),
+   ('DOC083', N'Ray Brunett Parra Galaviz'),
+   ('DOC084', N'Jose Mario García Valdez'),
+
+   /* ---------- MAESTROS ADMINISTRACIÓN DE REDES ---------- */
+   ('DOC085', N'Sergio Contreras Hernandez'),
+   
+   /* ---------- TALLER DE INVESTIGACIÓN II ---------- */
+   ('DOC086', N'Bogart Yail Marquez Lobato'),
+
+   /* ---------- INTELIGENCIA ARTIFICIAL ---------- */
+   ('DOC087', N'Arnulfo Alanis Garza')
+
+) AS v(Clave, Nombre)
+WHERE NOT EXISTS (SELECT 1 FROM Maestro m WHERE m.Clave = v.Clave);
