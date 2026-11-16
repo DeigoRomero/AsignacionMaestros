@@ -432,10 +432,6 @@ public sealed class FrmPrincipal : Form
         catch (Exception ex) { Error("No se pudo limpiar", ex); }
     }
 
-    private void Error(string titulo, Exception ex) =>
-        MessageBox.Show(ex.Message, titulo, MessageBoxButtons.OK, MessageBoxIcon.Error);
-}
-
     // Muestra un mensaje de error con el título y el mensaje de la excepción
     private void Error(string titulo, Exception ex) =>
         MessageBox.Show(ex.Message, titulo, MessageBoxButtons.OK, MessageBoxIcon.Error);
